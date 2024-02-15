@@ -14,3 +14,17 @@ but is wider than the width of the window,
 so you can only see a limited portion of each ribbon.
 In one of the windows, you can slide each ribbon to its left or right.
 To win the game, slide them until their pattern matches the other window.
+
+*Sample gameplay screen captures:*
+
+---
+
+![example screencap 1](sliderExample1.png)
+
+---
+
+![example screencap 2](sliderExample2.png)
+
+---
+
+![example screencap 2](sliderExample3.png)
