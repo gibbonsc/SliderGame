@@ -1,0 +1,345 @@
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script>
+        /*
+         * global variables
+         */
+        var difficulty, cursor, startTime, matchTime;
+        var strip = [];
+        var playfield = [];
+        var targets = [];
+        var glyph = [];
+        const STRIP_LENGTH = 24;
+        const STRIP_COUNT = 7;
+        const WINDOW_WIDTH = 9;
+        const STRIP_MAX = STRIP_LENGTH - WINDOW_WIDTH;
+
+        /*
+         * loadGlyphs: select glyphs based on selected difficulty level
+         * input parameter: level, integer between 0 and 5
+         * process: glyph array is populated with images
+         *   corresponding to that difficulty
+         * returns: n/a
+         */
+        function loadGlyphs(level) {
+            glyph = [];
+            switch (level) {
+            case 0:
+              glyph.push(document.getElementById("g0"));
+              glyph.push(document.getElementById("g1"));
+              glyph.push(document.getElementById("g2"));
+              glyph.push(document.getElementById("g3"));
+              glyph.push(document.getElementById("g4"));
+              glyph.push(document.getElementById("g5"));
+              glyph.push(document.getElementById("g6"));
+              glyph.push(document.getElementById("g7"));
+              glyph.push(document.getElementById("g8"));
+              glyph.push(document.getElementById("g9"));
+              glyph.push(document.getElementById("ga"));
+              glyph.push(document.getElementById("gb"));
+              glyph.push(document.getElementById("gc"));
+              glyph.push(document.getElementById("gd"));
+              glyph.push(document.getElementById("ge"));
+              glyph.push(document.getElementById("gf"));
+              break;
+            case 5:
+              glyph.push(document.getElementById("gslash"));
+              glyph.push(document.getElementById("gbackslash"));
+              break;
+            case 4:
+              glyph.push(document.getElementById("ghourglass"));
+              glyph.push(document.getElementById("gleftknob"));
+              glyph.push(document.getElementById("grightknob"));
+              break;
+            case 3:
+              glyph.push(document.getElementById("gcsw"));
+              glyph.push(document.getElementById("gcnw"));
+              glyph.push(document.getElementById("gcne"));
+              glyph.push(document.getElementById("gcse"));
+              break;
+            case 2:
+              glyph.push(document.getElementById("gh100"));
+              glyph.push(document.getElementById("gh110"));
+              glyph.push(document.getElementById("gh011"));
+              glyph.push(document.getElementById("gh001"));
+              glyph.push(document.getElementById("gh101"));
+              break;
+            default:
+              glyph.push(document.getElementById("w4"));
+              glyph.push(document.getElementById("wu"));
+              glyph.push(document.getElementById("wl"));
+              glyph.push(document.getElementById("wd"));
+              glyph.push(document.getElementById("wr"));
+              glyph.push(document.getElementById("wh"));
+              glyph.push(document.getElementById("wv"));
+            }
+        }
+
+        /*
+         * fsInit(): start a new game of selected difficulty level
+         * input parameter: selection (integer between 0 and 5)
+         * process: set up game variables and draw the target pattern
+         * returns: n/a
+         */
+        function fsInit(selection) {
+            difficulty = selection;
+            loadGlyphs(difficulty);
+            var i, r, c, position, index;
+            var fsCanvas = document.getElementById("fsCanvas");
+            var fsContext = fsCanvas.getContext("2d");
+            fsContext.fillStyle = "#FFFFFF"; //white
+            fsContext.fillRect(0, 0, 320, 240); // erase the fsCanvas
+            cursor = STRIP_COUNT - 1; // start cursor at pattern's bottom row
+            strip = [];
+            playfield = [];
+            targets = [];
+            // initialize the strip of glyphs that will be used in each row
+            for (i=0; i<STRIP_LENGTH; ++i) {
+                strip.push(Math.floor(Math.random()*glyph.length));
+            }
+            // set up random start and goal positions for each row
+            for (i=0; i<STRIP_COUNT; ++i) {
+                playfield.push(Math.floor(Math.random()*STRIP_MAX));
+                targets.push(Math.floor(Math.random()*STRIP_MAX));
+            }
+            // draw the goal pattern
+            for (r = 0; r < STRIP_COUNT; ++r) {
+                position = targets[r];
+                for (c = 0; c < WINDOW_WIDTH; ++c) {
+                    index = strip[position+c];
+                    fsContext.drawImage(
+                        glyph[index],16*(c+ WINDOW_WIDTH + 1),16*(r+1));
+                }
+            }
+            // record the starting time
+            startTime = new Date();
+            document.getElementById("elapsedTime").innerHTML = "&nbsp;";
+            // enable player's input controls (four buttons and keyboard)
+            document.getElementById("up").disabled = false;
+            document.getElementById("left").disabled = false;
+            document.getElementById("right").disabled = false;
+            document.getElementById("down").disabled = false;
+            document.addEventListener('keydown', keyDownHandler, false);
+        }
+
+        /*
+         * fs(): re-render the screen after each move
+         * input parameters: none
+         * process: based on values of global variables,
+         *   draw the player's current pattern, row by row,
+         *   and display the cursor on its current row
+         * returns: n/a
+         */
+        function fs() {
+            loadGlyphs(difficulty);
+            var r, c, index, position, victory;
+            var fsCanvas = document.getElementById("fsCanvas");
+            var fsContext = fsCanvas.getContext("2d");
+            // erase the player's previous pattern
+            fsContext.fillStyle = "#FFFFFF"; //white
+            fsContext.fillRect(0, 0, 16*(1+WINDOW_WIDTH), 16*(STRIP_COUNT+1));
+            // draw the player's current pattern
+            for (r = 0; r < STRIP_COUNT; ++r) {
+                position = playfield[r];
+                for (c = 0; c < WINDOW_WIDTH; ++c) {
+                    index = strip[position+c];
+                    fsContext.drawImage(
+                        glyph[index],0 + 16*c,16 + 16*r);
+                }
+            }
+            // erase the player's previous cursor
+            fsContext.fillStyle = "#FFFFFF"; //white
+            fsContext.fillRect(16*WINDOW_WIDTH, 0, 16*STRIP_COUNT, 16);
+            // draw the player's current cursor
+            fsContext.fillStyle = "#0000FF"; //blue
+            fsContext.fillRect(16*WINDOW_WIDTH, 16*(1+cursor), 15, 15);
+            // check whether the player's and target patterns match
+            victory = true;
+            for (r=0; r<STRIP_COUNT; ++r) {
+                if (playfield[r] != targets[r]) {
+                    victory = false; break;
+                }
+            }
+            // if matched, end the game and display the playing time
+            if (victory) {
+                // display a nifty reward shout-out under the patterns
+                fsContext.font = "32px Verdana";
+                fsContext.strokeText("Matched!",64, 16*(4 + STRIP_COUNT) );
+                // calculate and display total playing time
+                matchTime = new Date();
+                c = (matchTime - startTime) / 1000;
+                document.getElementById("elapsedTime").innerHTML
+                  = "Elapsed time: " + c + " seconds";
+                // disable player's button and keyboard controls
+                document.removeEventListener('keydown', keyDownHandler);
+                document.getElementById("up").disabled = true;
+                document.getElementById("left").disabled = true;
+                document.getElementById("right").disabled = true;
+                document.getElementById("down").disabled = true;
+            }
+        }
+
+        /*
+         * fsUp(), fsDown(): move the player's cursor indicator
+         */
+        function fsUp() { if (cursor > 0) { cursor--; } }
+        function fsDown() { if (cursor < STRIP_COUNT - 1) { cursor++; } }
+
+        /*
+         * fsLeft, fsRight(): shift the row indicated by the player's cursor
+         */
+        function fsLeft() {
+            var position = playfield[cursor];
+            if (position < STRIP_MAX) { playfield[cursor]++; }
+        }
+        function fsRight() {
+            var position = playfield[cursor];
+            if (position > 0) { playfield[cursor]--; }
+        }
+
+        /*
+         * keyDownHandler: event handler allowing player to use
+         *   keyboard controls in addition to the HTML buttons
+         */
+        function keyDownHandler(event) {
+          var k = event.keyCode;
+          //document.getElementById("elapsedTime").innerHTML=""+k; //to debug
+          if (k == 39) { // right
+            fsRight(); fs();
+          } else if (k == 37) { // left
+            fsLeft(); fs();
+          } else if (k == 40) { // down
+            fsDown(); fs();
+          } else if (k == 38) { // up
+            fsUp(); fs();
+          }
+        }
+        </script>
+        <style>
+            /* if used, CSS would go here */
+        </style>
+    </head>
+
+    <body>
+        <table>
+        <tr>
+        <td>
+          <!-- first column: show the glyphs used in each difficulty level -->
+          <p>Easiest:</p>
+          <div id="row0">
+          <img id="g0" src="0.png" />
+          <img id="g1" src="1.png" />
+          <img id="g2" src="2.png" />
+          <img id="g3" src="3.png" />
+          <img id="g4" src="4.png" />
+          <img id="g5" src="5.png" />
+          <img id="g6" src="6.png" />
+          <img id="g7" src="7.png" /><br />
+          <img id="g8" src="8.png" />
+          <img id="g9" src="9.png" />
+          <img id="ga" src="a.png" />
+          <img id="gb" src="b.png" />
+          <img id="gc" src="c.png" />
+          <img id="gd" src="d.png" />
+          <img id="ge" src="e.png" />
+          <img id="gf" src="f.png" />
+          </div>
+          <p>Kind of easy:</p>
+          <div>
+          <img id="w4" src="w4.png" />
+          <img id="wu" src="wu.png" />
+          <img id="wl" src="wl.png" />
+          <img id="wd" src="wd.png" />
+          <img id="wr" src="wr.png" />
+          <img id="wh" src="wh.png" />
+          <img id="wv" src="wv.png" />
+          </div>
+          <p>Not too hard:</p>
+          <div>
+          <img id="gh011" src="h011.png" />
+          <img id="gh001" src="h001.png" />
+          <img id="gh101" src="h101.png" />
+          <img id="gh100" src="h100.png" />
+          <img id="gh110" src="h110.png" />
+          </div>
+          <p>Somewhat hard:</p>
+          <div>
+          <img id="gcnw" src="curvnw.png" />
+          <img id="gcsw" src="curvsw.png" />
+          <img id="gcse" src="curvse.png" />
+          <img id="gcne" src="curvne.png" />
+          </div>
+          <p>Very hard:</p>
+          <div>
+          <img id="gleftknob" src="knobl.png" />
+          <img id="ghourglass" src="knobh.png" />
+          <img id="grightknob" src="knobr.png" />
+          </div>
+          <p>Hardest:</p>
+          <div>
+          <img id="gslash" src="slash.png" />
+          <img id="gbackslash" src="backslash.png" />
+          </div>
+        </td>
+        <!-- Second column: instructions, playfield canvas,
+             and player's controls -->
+        <td><div style="text-align: center;">
+          Make the pattern on the left <br />
+          match the pattern on the right, <br />
+          by sliding each individual row left and right. <br />
+         (Each row has the same pattern.) <br />
+        </div>
+        <canvas id="fsCanvas"
+          width="320" height="240"
+          style="border:1px solid #FFFFFF">[fsCanvas]</canvas><br />
+        <div id="elapsedTime">&nbsp;</div>
+        <!-- (put player's control buttons in an embedded table) -->
+          <table style="display: block; margin-left: auto; margin-right: auto; width: 50%">
+          <tr>
+            <td>&nbsp;</td>
+            <td><button id="up" type="button"
+              onClick="fsUp();fs()" disabled
+              >&nbsp;Up&nbsp;</button></td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td><button id="left" type=button"
+              onClick="fsLeft();fs()" disabled
+              >Left</button></td>
+            <td><button id="down" type=button"
+              onClick="fsDown();fs()" disabled
+              >Down</button></td>
+            <td><button id="right" type=button"
+              onClick="fsRight();fs()" disabled
+              >Right</button></td>
+          </tr>
+          </table>
+        </td>
+        <!-- Third column: game selection and start buttons -->
+        <td>
+          <button id="startRestart" type="button" onClick="fsInit(0);fs()"
+            >Start (Easiest)</button><br />&nbsp;<br />
+          <button id="startRestart" type="button" onClick="fsInit(1);fs()"
+            >Start (Kind of easy)</button><br />&nbsp;<br />
+          <button id="startRestart" type="button" onClick="fsInit(2);fs()"
+            >Start (Not too hard)</button><br />&nbsp;<br />
+          <button id="startRestart" type="button" onClick="fsInit(3);fs()"
+            >Start (Somewhat hard)</button><br />&nbsp;<br />
+          <button id="startRestart" type="button" onClick="fsInit(4);fs()"
+            >Start (Very hard)</button><br />&nbsp;<br />
+          <button id="startRestart" type="button" onClick="fsInit(5);fs()"
+            >Start (Hardest)</button><br />&nbsp;<br />
+        </td>
+        </tr>
+        </table>
+        <script>
+            /* put JS code here */
+            // (global vars are initialized in head element instead of here)
+        </script>
+    </body>
+
+</html>
